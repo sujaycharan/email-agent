@@ -1,5 +1,6 @@
 import base64
 import re
+from datetime import datetime
 from email.utils import parsedate_to_datetime
 from typing import Optional, Dict, Any, List, Tuple
 from google.oauth2.credentials import Credentials
@@ -55,13 +56,17 @@ def parse_sender(from_header: str) -> Tuple[Optional[str], Optional[str]]:
     return (None, from_header.strip())
 
 
-def fetch_unread_emails(service) -> List[Dict[str, Any]]:
+def fetch_unread_emails(service, since: Optional[datetime] = None) -> List[Dict[str, Any]]:
+    query = "is:unread"
+    if since:
+        query += f" after:{int(since.timestamp())}"
+
     messages = []
     page_token = None
     while True:
         result = service.users().messages().list(
             userId="me",
-            q="is:unread",
+            q=query,
             pageToken=page_token,
             maxResults=50,
         ).execute()

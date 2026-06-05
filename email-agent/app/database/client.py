@@ -55,9 +55,16 @@ def insert_email(email: EmailRecord) -> EmailRecord:
     return email
 
 
+def update_gmail_connected_at(email: str):
+    supabase.table("user_accounts").update({
+        "gmail_connected_at": datetime.utcnow().isoformat(),
+    }).eq("email", email).execute()
+
+
 def insert_chunk_with_embedding(chunk: EmailChunk, embedding: list):
     data = chunk.model_dump(mode="json")
     data["embedding"] = embedding
+    supabase.table("email_chunks").insert(data).execute()
 
 
 def insert_chat_message(msg: ChatMessage):

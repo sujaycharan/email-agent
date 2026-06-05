@@ -8,6 +8,7 @@ CREATE TABLE user_accounts (
   gmail_refresh_token TEXT,
   gmail_access_token TEXT,
   gmail_token_expiry TIMESTAMPTZ,
+  gmail_connected_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -73,3 +74,6 @@ BEGIN
   LIMIT match_count;
 END;
 $$;
+
+-- Add gmail_connected_at column if upgrading from earlier version
+ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS gmail_connected_at TIMESTAMPTZ;

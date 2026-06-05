@@ -12,6 +12,7 @@ class UserAccount(BaseModel):
     gmail_refresh_token: Optional[str] = None
     gmail_access_token: Optional[str] = None
     gmail_token_expiry: Optional[datetime] = None
+    gmail_connected_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.now)
 
 

@@ -1,7 +1,7 @@
 import google.generativeai as genai
 import logging
 import threading
-import time
+from datetime import datetime
 
 from app.config import settings
 from app.gmail.fetcher import (
@@ -61,8 +61,15 @@ def process_user_emails(user: UserAccount):
         )
 
         label_id = ensure_label(service)
-        messages = fetch_unread_emails(service)
-        logger.info(f"{user.email}: {len(messages)} unread emails found")
+
+        since = user.gmail_connected_at
+        if not since:
+            logger.info(f"{user.email}: first connection, setting gmail_connected_at to now and skipping old emails")
+            db.update_gmail_connected_at(user.email)
+            since = datetime.now()
+
+        messages = fetch_unread_emails(service, since=since)
+        logger.info(f"{user.email}: {len(messages)} unread emails since {since}")
 
         processed = 0
         for msg in messages:
@@ -103,7 +110,7 @@ def process_user_emails(user: UserAccount):
         logger.info(f"{user.email}: processed {processed} emails")
 
     except Exception as e:
-        logger.error(f"Error processing emails for {user.email}: {e}")
+        logger.error(f"Error processing emails for {user.email}: {e}", exc_info=True)
 
 
 def process_user_emails_async(user: UserAccount):

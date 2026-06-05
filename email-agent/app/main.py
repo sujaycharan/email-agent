@@ -80,4 +80,5 @@ async def auth_gmail_callback(code: str, state: str):
         db.create_user(user)
 
     db.update_user_tokens(email, refresh_token, access_token, expiry)
+    db.update_gmail_connected_at(email)
     return {"message": "Gmail connected successfully! You can close this tab."}
