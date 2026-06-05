@@ -18,8 +18,8 @@ from app.database import client as db
 
 logger = logging.getLogger(__name__)
 
-EMBED_URL = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={settings.gemini_api_key}"
-SUMMARY_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={settings.gemini_api_key}"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={settings.gemini_api_key}"
+EMBED_URL = f"https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key={settings.gemini_api_key}"
 
 MAX_EMAILS_PER_RUN = 5
 
@@ -29,12 +29,15 @@ def _generate_embedding(text: str) -> list[float]:
         resp = client.post(
             EMBED_URL,
             json={
-                "model": "models/text-embedding-004",
                 "content": {"parts": [{"text": text}]},
                 "taskType": "RETRIEVAL_DOCUMENT",
             },
         )
-        return resp.json()["embedding"]["values"]
+        data = resp.json()
+        if "embedding" not in data:
+            logger.error(f"Embedding API error: {data}")
+            raise Exception(f"Embedding API returned: {data}")
+        return data["embedding"]["values"]
 
 
 def _generate_summary(email: EmailRecord) -> str:
@@ -54,7 +57,7 @@ Keep it under 100 words."""
 
     with httpx.Client() as client:
         resp = client.post(
-            SUMMARY_URL,
+            GEMINI_URL,
             json={"contents": [{"parts": [{"text": prompt}]}]},
         )
         data = resp.json()

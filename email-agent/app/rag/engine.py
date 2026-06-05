@@ -1,11 +1,14 @@
 import httpx
+import logging
 from app.config import settings
 from app.database import vector_store
 from app.models import ChatMessage
 from typing import List
 
-EMBED_URL = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={settings.gemini_api_key}"
-CHAT_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={settings.gemini_api_key}"
+logger = logging.getLogger(__name__)
+
+EMBED_URL = f"https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key={settings.gemini_api_key}"
+CHAT_URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={settings.gemini_api_key}"
 
 
 def _embed_text(text: str, task_type: str = "RETRIEVAL_QUERY") -> list[float]:
@@ -13,12 +16,15 @@ def _embed_text(text: str, task_type: str = "RETRIEVAL_QUERY") -> list[float]:
         resp = client.post(
             EMBED_URL,
             json={
-                "model": "models/text-embedding-004",
                 "content": {"parts": [{"text": text}]},
                 "taskType": task_type,
             },
         )
-        return resp.json()["embedding"]["values"]
+        data = resp.json()
+        if "embedding" not in data:
+            logger.error(f"Embedding API error: {data}")
+            raise Exception(f"Embedding API returned: {data}")
+        return data["embedding"]["values"]
 
 
 def answer_question(user_id: str, question: str, chat_history: List[ChatMessage]) -> str:
