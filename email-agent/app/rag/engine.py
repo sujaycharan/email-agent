@@ -20,12 +20,12 @@ def _get_nlp():
         try:
             _nlp = spacy.load("en_core_web_sm")
         except OSError:
-            logger.info("Downloading en_core_web_sm model...")
+            logger.info("Downloading en_core_web_md model...")
             subprocess.run(
-                [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
+                [sys.executable, "-m", "spacy", "download", "en_core_web_md"],
                 check=True, capture_output=True,
             )
-            _nlp = spacy.load("en_core_web_sm")
+            _nlp = spacy.load("en_core_web_md")
     return _nlp
 
 
