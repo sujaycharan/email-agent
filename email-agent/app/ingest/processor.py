@@ -62,15 +62,27 @@ Mention:
 Keep it under 100 words."""
 
     import httpx
-    with httpx.Client() as client:
-        resp = client.post(
-            GEMINI_URL,
-            json={"contents": [{"parts": [{"text": prompt}]}]},
-        )
-        data = resp.json()
-        summary = data["candidates"][0]["content"]["parts"][0]["text"]
-
-    return f"📬 {email.sender_name or email.sender_email} - {email.subject}\n\n{summary}"
+    import time
+    for attempt in range(3):
+        with httpx.Client() as client:
+            resp = client.post(
+                GEMINI_URL,
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+            )
+            if resp.status_code == 429:
+                wait = 2 ** attempt
+                logger.warning(f"Gemini rate limited, retrying in {wait}s...")
+                time.sleep(wait)
+                continue
+            data = resp.json()
+            candidates = data.get("candidates")
+            if candidates:
+                summary = candidates[0]["content"]["parts"][0]["text"]
+                return f"📬 {email.sender_name or email.sender_email} - {email.subject}\n\n{summary}"
+            logger.error(f"Gemini error: {data}")
+            break
+    header = email.sender_name or email.sender_email
+    return f"📬 {header} - {email.subject}"
 
 
 def process_user_emails(user: UserAccount):
@@ -125,9 +137,12 @@ def process_user_emails(user: UserAccount):
 
             processed += 1
             if user.whatsapp_number:
-                from app.chat.whatsapp import send_summary
-                summary = _generate_summary(email)
-                send_summary(user.whatsapp_number, summary)
+                try:
+                    from app.chat.whatsapp import send_summary
+                    summary = _generate_summary(email)
+                    send_summary(user.whatsapp_number, summary)
+                except Exception as e:
+                    logger.error(f"Failed to send WhatsApp notification: {e}")
 
         logger.info(f"{user.email}: processed {processed} emails")
 
