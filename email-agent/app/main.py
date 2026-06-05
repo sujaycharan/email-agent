@@ -64,8 +64,12 @@ async def auth_gmail(email: str):
 @app.get("/auth/gmail/callback")
 async def auth_gmail_callback(code: str, state: str):
     import json
-    state_data = json.loads(state)
-    email = state_data["email"]
+    try:
+        state_data = json.loads(state)
+        email = state_data["email"]
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return {"error": "This link is expired. Please text the WhatsApp bot again to get a fresh Gmail connection link."}
+
     refresh_token, access_token, expiry = exchange_code(code, state)
 
     user = db.get_user_by_email(email)
