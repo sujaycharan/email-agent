@@ -1,4 +1,4 @@
-import httpx
+import spacy
 import logging
 import threading
 from datetime import datetime
@@ -19,29 +19,21 @@ from app.database import client as db
 logger = logging.getLogger(__name__)
 
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={settings.gemini_api_key}"
-EMBED_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
+
+_nlp = None
+
+def _get_nlp():
+    global _nlp
+    if _nlp is None:
+        _nlp = spacy.load("en_core_web_sm")
+    return _nlp
 
 MAX_EMAILS_PER_RUN = 5
 
 
 def _generate_embedding(text: str) -> list[float]:
-    with httpx.Client(timeout=30) as client:
-        resp = client.post(
-            EMBED_URL,
-            json={"inputs": text, "options": {"wait_for_model": True}},
-        )
-        data = resp.json()
-        if isinstance(data, list) and data and isinstance(data[0], list):
-            dim = len(data[0])
-            pooled = [0.0] * dim
-            for vec in data:
-                for i in range(dim):
-                    pooled[i] += vec[i]
-            return [v / len(data) for v in pooled]
-        if isinstance(data, list) and data and isinstance(data[0], (int, float)):
-            return data
-        logger.error(f"Embedding API error: {data}")
-        raise Exception(f"Unexpected embedding format: {data}")
+    doc = _get_nlp()(text[:5000])
+    return doc.vector.tolist()
 
 
 def _generate_summary(email: EmailRecord) -> str:
@@ -59,6 +51,7 @@ Mention:
 
 Keep it under 100 words."""
 
+    import httpx
     with httpx.Client() as client:
         resp = client.post(
             GEMINI_URL,

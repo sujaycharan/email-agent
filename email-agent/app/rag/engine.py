@@ -1,3 +1,4 @@
+import spacy
 import httpx
 import logging
 from app.config import settings
@@ -7,32 +8,24 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 
-EMBED_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
 CHAT_URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={settings.gemini_api_key}"
+
+_nlp = None
+
+def _get_nlp():
+    global _nlp
+    if _nlp is None:
+        _nlp = spacy.load("en_core_web_sm")
+    return _nlp
 
 
 def _embed_text(text: str) -> list[float]:
-    with httpx.Client(timeout=30) as client:
-        resp = client.post(
-            EMBED_URL,
-            json={"inputs": text, "options": {"wait_for_model": True}},
-        )
-        data = resp.json()
-        if isinstance(data, list) and data and isinstance(data[0], list):
-            dim = len(data[0])
-            pooled = [0.0] * dim
-            for vec in data:
-                for i in range(dim):
-                    pooled[i] += vec[i]
-            return [v / len(data) for v in pooled]
-        if isinstance(data, list) and data and isinstance(data[0], (int, float)):
-            return data
-        logger.error(f"Embedding API error: {data}")
-        raise Exception(f"Unexpected embedding format: {data}")
+    doc = _get_nlp()(text[:5000])
+    return doc.vector.tolist()
 
 
 def answer_question(user_id: str, question: str, chat_history: List[ChatMessage]) -> str:
-    query_embedding = _embed_text(question, task_type="RETRIEVAL_QUERY")
+    query_embedding = _embed_text(question)
 
     chunks = vector_store.search_similar(user_id, query_embedding, top_k=5)
 

@@ -33,7 +33,7 @@ CREATE TABLE email_chunks (
   user_id UUID NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
   chunk_index INT NOT NULL,
   content TEXT NOT NULL,
-  embedding VECTOR(384),
+  embedding VECTOR(300),
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -51,7 +51,7 @@ CREATE TABLE chat_messages (
 CREATE INDEX idx_chat_messages_user_id ON chat_messages(user_id);
 
 CREATE OR REPLACE FUNCTION search_email_chunks(
-  query_embedding VECTOR(384),
+  query_embedding VECTOR(300),
   user_uuid UUID,
   match_count INT DEFAULT 5
 ) RETURNS TABLE(
@@ -75,8 +75,8 @@ BEGIN
 END;
 $$;
 
--- Changes for existing deployments upgrading from VECTOR(768) to VECTOR(384)
+-- Changes for existing deployments upgrading from VECTOR(768/384) to VECTOR(300)
 ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS gmail_connected_at TIMESTAMPTZ;
-ALTER TABLE email_chunks ALTER COLUMN embedding TYPE VECTOR(384);
+ALTER TABLE email_chunks ALTER COLUMN embedding TYPE VECTOR(300);
 DROP INDEX IF EXISTS idx_email_chunks_embedding;
 CREATE INDEX idx_email_chunks_embedding ON email_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
