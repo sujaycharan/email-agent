@@ -7,24 +7,28 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 
-EMBED_URL = f"https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key={settings.gemini_api_key}"
+EMBED_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
 CHAT_URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={settings.gemini_api_key}"
 
 
-def _embed_text(text: str, task_type: str = "RETRIEVAL_QUERY") -> list[float]:
-    with httpx.Client() as client:
+def _embed_text(text: str) -> list[float]:
+    with httpx.Client(timeout=30) as client:
         resp = client.post(
             EMBED_URL,
-            json={
-                "content": {"parts": [{"text": text}]},
-                "taskType": task_type,
-            },
+            json={"inputs": text, "options": {"wait_for_model": True}},
         )
         data = resp.json()
-        if "embedding" not in data:
-            logger.error(f"Embedding API error: {data}")
-            raise Exception(f"Embedding API returned: {data}")
-        return data["embedding"]["values"]
+        if isinstance(data, list) and data and isinstance(data[0], list):
+            dim = len(data[0])
+            pooled = [0.0] * dim
+            for vec in data:
+                for i in range(dim):
+                    pooled[i] += vec[i]
+            return [v / len(data) for v in pooled]
+        if isinstance(data, list) and data and isinstance(data[0], (int, float)):
+            return data
+        logger.error(f"Embedding API error: {data}")
+        raise Exception(f"Unexpected embedding format: {data}")
 
 
 def answer_question(user_id: str, question: str, chat_history: List[ChatMessage]) -> str:
