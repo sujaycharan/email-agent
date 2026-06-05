@@ -1,3 +1,5 @@
+import json
+
 from google_auth_oauthlib.flow import Flow
 from app.config import settings
 from datetime import datetime
@@ -23,13 +25,16 @@ def _build_flow():
 def get_auth_url(email: str) -> str:
     flow = _build_flow()
     flow.redirect_uri = f"{settings.app_url}/auth/gmail/callback"
-    auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline", state=email)
+    state = json.dumps({"email": email, "cv": flow.code_verifier})
+    auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline", state=state)
     return auth_url
 
 
-def exchange_code(code: str) -> tuple[str, str, datetime]:
+def exchange_code(code: str, state: str) -> tuple[str, str, datetime]:
+    state_data = json.loads(state)
+    code_verifier = state_data.get("cv")
     flow = _build_flow()
     flow.redirect_uri = f"{settings.app_url}/auth/gmail/callback"
-    flow.fetch_token(code=code)
+    flow.fetch_token(code=code, code_verifier=code_verifier)
     creds = flow.credentials
     return creds.refresh_token, creds.token, creds.expiry

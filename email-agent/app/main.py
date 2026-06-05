@@ -63,8 +63,10 @@ async def auth_gmail(email: str):
 
 @app.get("/auth/gmail/callback")
 async def auth_gmail_callback(code: str, state: str):
-    email = state
-    refresh_token, access_token, expiry = exchange_code(code)
+    import json
+    state_data = json.loads(state)
+    email = state_data["email"]
+    refresh_token, access_token, expiry = exchange_code(code, state)
 
     user = db.get_user_by_email(email)
     if not user:
