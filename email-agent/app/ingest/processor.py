@@ -20,8 +20,6 @@ from app.database import client as db
 
 logger = logging.getLogger(__name__)
 
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={settings.gemini_api_key}"
-
 _nlp = None
 
 def _get_nlp():
@@ -47,42 +45,11 @@ def _generate_embedding(text: str) -> list[float]:
 
 
 def _generate_summary(email: EmailRecord) -> str:
-    prompt = f"""Explain this email to a normal person. Be concise.
-
-From: {email.sender_name or email.sender_email}
-Subject: {email.subject}
-Body: {email.body_text[:2000]}
-
-Mention:
-- Who sent it
-- What it's about
-- Any action required
-- Any deadlines
-
-Keep it under 100 words."""
-
-    import httpx
-    import time
-    for wait in [0, 30]:
-        if wait:
-            logger.warning(f"Gemini rate limited, waiting {wait}s...")
-            time.sleep(wait)
-        with httpx.Client() as client:
-            resp = client.post(
-                GEMINI_URL,
-                json={"contents": [{"parts": [{"text": prompt}]}]},
-            )
-            if resp.status_code == 429:
-                continue
-            data = resp.json()
-            candidates = data.get("candidates")
-            if candidates:
-                summary = candidates[0]["content"]["parts"][0]["text"]
-                return f"📬 {email.sender_name or email.sender_email} - {email.subject}\n\n{summary}"
-            logger.error(f"Gemini error: {data}")
-            break
+    body = (email.body_text or "")[:300]
+    lines = [l for l in body.split("\n") if l.strip()]
+    snippet = " | ".join(lines[:3])
     header = email.sender_name or email.sender_email
-    return f"📬 {header} - {email.subject}"
+    return f"📬 {header} - {email.subject}\n\n{snippet}"
 
 
 def process_user_emails(user: UserAccount):
