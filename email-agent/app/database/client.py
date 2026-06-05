@@ -22,7 +22,7 @@ def get_user_by_email(email: str) -> Optional[UserAccount]:
 
 
 def create_user(user: UserAccount) -> UserAccount:
-    supabase.table("user_accounts").insert(user.model_dump()).execute()
+    supabase.table("user_accounts").insert(user.model_dump(mode="json")).execute()
     return user
 
 
@@ -51,18 +51,17 @@ def email_exists(user_id: str, gmail_message_id: str) -> bool:
 
 
 def insert_email(email: EmailRecord) -> EmailRecord:
-    supabase.table("emails").insert(email.model_dump()).execute()
+    supabase.table("emails").insert(email.model_dump(mode="json")).execute()
     return email
 
 
 def insert_chunk_with_embedding(chunk: EmailChunk, embedding: list):
-    data = chunk.model_dump()
+    data = chunk.model_dump(mode="json")
     data["embedding"] = embedding
-    supabase.table("email_chunks").insert(data).execute()
 
 
 def insert_chat_message(msg: ChatMessage):
-    supabase.table("chat_messages").insert(msg.model_dump()).execute()
+    supabase.table("chat_messages").insert(msg.model_dump(mode="json")).execute()
 
 
 def get_recent_chat_history(user_id: str, limit: int = 10) -> List[ChatMessage]:
