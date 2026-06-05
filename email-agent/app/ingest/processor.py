@@ -1,5 +1,7 @@
 import google.generativeai as genai
 import logging
+import threading
+import time
 
 from app.config import settings
 from app.gmail.fetcher import (
@@ -16,6 +18,8 @@ from app.database import client as db
 
 logger = logging.getLogger(__name__)
 genai.configure(api_key=settings.gemini_api_key)
+
+MAX_EMAILS_PER_RUN = 5
 
 
 def _generate_embedding(text: str) -> list[float]:
@@ -48,6 +52,7 @@ Keep it under 100 words."""
 
 
 def process_user_emails(user: UserAccount):
+    logger.info(f"Processing emails for {user.email}")
     try:
         service = get_gmail_service(
             user.gmail_refresh_token,
@@ -57,8 +62,14 @@ def process_user_emails(user: UserAccount):
 
         label_id = ensure_label(service)
         messages = fetch_unread_emails(service)
+        logger.info(f"{user.email}: {len(messages)} unread emails found")
 
+        processed = 0
         for msg in messages:
+            if processed >= MAX_EMAILS_PER_RUN:
+                logger.info(f"{user.email}: hit limit of {MAX_EMAILS_PER_RUN}, stopping")
+                break
+
             msg_id = msg["id"]
 
             if db.email_exists(user.id, msg_id):
@@ -83,10 +94,18 @@ def process_user_emails(user: UserAccount):
             mark_as_read(service, msg_id)
             add_label(service, msg_id, label_id)
 
+            processed += 1
             if user.whatsapp_number:
                 from app.chat.whatsapp import send_summary
                 summary = _generate_summary(email)
                 send_summary(user.whatsapp_number, summary)
 
+        logger.info(f"{user.email}: processed {processed} emails")
+
     except Exception as e:
         logger.error(f"Error processing emails for {user.email}: {e}")
+
+
+def process_user_emails_async(user: UserAccount):
+    thread = threading.Thread(target=process_user_emails, args=(user,), daemon=True)
+    thread.start()

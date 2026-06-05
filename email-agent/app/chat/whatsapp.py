@@ -43,9 +43,9 @@ async def handle_incoming_message(from_number: str, body: str) -> str:
         return f"Please connect your Gmail first: {settings.app_url}/auth/gmail?email={user.email}"
 
     if body.lower() == "check mail":
-        from app.ingest.processor import process_user_emails
-        process_user_emails(user)
-        return "Checked your mail!"
+        from app.ingest.processor import process_user_emails_async
+        process_user_emails_async(user)
+        return "Checking your mail... I'll notify you on WhatsApp when something arrives."
 
     chat_history = db.get_recent_chat_history(user.id, limit=5)
     answer = answer_question(user.id, body, chat_history)

@@ -22,8 +22,10 @@ scheduler = BackgroundScheduler()
 def scheduled_email_check():
     logger.info("Checking emails for all users...")
     users = db.get_users_with_gmail()
+    logger.info(f"Found {len(users)} user(s) with Gmail")
     for user in users:
         process_user_emails(user)
+    logger.info("Email check finished")
 
 
 @asynccontextmanager
