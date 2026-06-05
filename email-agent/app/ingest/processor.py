@@ -63,16 +63,16 @@ Keep it under 100 words."""
 
     import httpx
     import time
-    for attempt in range(3):
+    for wait in [0, 30]:
+        if wait:
+            logger.warning(f"Gemini rate limited, waiting {wait}s...")
+            time.sleep(wait)
         with httpx.Client() as client:
             resp = client.post(
                 GEMINI_URL,
                 json={"contents": [{"parts": [{"text": prompt}]}]},
             )
             if resp.status_code == 429:
-                wait = 2 ** attempt
-                logger.warning(f"Gemini rate limited, retrying in {wait}s...")
-                time.sleep(wait)
                 continue
             data = resp.json()
             candidates = data.get("candidates")
