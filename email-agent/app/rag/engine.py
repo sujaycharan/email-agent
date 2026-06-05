@@ -1,6 +1,8 @@
 import spacy
 import httpx
 import logging
+import subprocess
+import sys
 from app.config import settings
 from app.database import vector_store
 from app.models import ChatMessage
@@ -15,7 +17,15 @@ _nlp = None
 def _get_nlp():
     global _nlp
     if _nlp is None:
-        _nlp = spacy.load("en_core_web_sm")
+        try:
+            _nlp = spacy.load("en_core_web_sm")
+        except OSError:
+            logger.info("Downloading en_core_web_sm model...")
+            subprocess.run(
+                [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
+                check=True, capture_output=True,
+            )
+            _nlp = spacy.load("en_core_web_sm")
     return _nlp
 
 

@@ -1,6 +1,8 @@
 import spacy
 import logging
 import threading
+import subprocess
+import sys
 from datetime import datetime
 
 from app.config import settings
@@ -25,7 +27,15 @@ _nlp = None
 def _get_nlp():
     global _nlp
     if _nlp is None:
-        _nlp = spacy.load("en_core_web_sm")
+        try:
+            _nlp = spacy.load("en_core_web_sm")
+        except OSError:
+            logger.info("Downloading en_core_web_sm model...")
+            subprocess.run(
+                [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
+                check=True, capture_output=True,
+            )
+            _nlp = spacy.load("en_core_web_sm")
     return _nlp
 
 MAX_EMAILS_PER_RUN = 5
