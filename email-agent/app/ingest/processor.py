@@ -1,4 +1,4 @@
-import google.generativeai as genai
+import httpx
 import logging
 import threading
 from datetime import datetime
@@ -17,18 +17,24 @@ from app.models import EmailRecord, EmailChunk, UserAccount
 from app.database import client as db
 
 logger = logging.getLogger(__name__)
-genai.configure(api_key=settings.gemini_api_key)
+
+EMBED_URL = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={settings.gemini_api_key}"
+SUMMARY_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={settings.gemini_api_key}"
 
 MAX_EMAILS_PER_RUN = 5
 
 
 def _generate_embedding(text: str) -> list[float]:
-    result = genai.embed_content(
-        model="models/embedding-001",
-        content=text,
-        task_type="retrieval_document",
-    )
-    return result["embedding"]
+    with httpx.Client() as client:
+        resp = client.post(
+            EMBED_URL,
+            json={
+                "model": "models/text-embedding-004",
+                "content": {"parts": [{"text": text}]},
+                "taskType": "RETRIEVAL_DOCUMENT",
+            },
+        )
+        return resp.json()["embedding"]["values"]
 
 
 def _generate_summary(email: EmailRecord) -> str:
@@ -46,9 +52,15 @@ Mention:
 
 Keep it under 100 words."""
 
-    model = genai.GenerativeModel("gemini-2.0-flash")
-    response = model.generate_content(prompt)
-    return f"📬 {email.sender_name or email.sender_email} - {email.subject}\n\n{response.text}"
+    with httpx.Client() as client:
+        resp = client.post(
+            SUMMARY_URL,
+            json={"contents": [{"parts": [{"text": prompt}]}]},
+        )
+        data = resp.json()
+        summary = data["candidates"][0]["content"]["parts"][0]["text"]
+
+    return f"📬 {email.sender_name or email.sender_email} - {email.subject}\n\n{summary}"
 
 
 def process_user_emails(user: UserAccount):

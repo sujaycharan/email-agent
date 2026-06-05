@@ -1,23 +1,28 @@
-import google.generativeai as genai
+import httpx
 from app.config import settings
 from app.database import vector_store
 from app.models import ChatMessage
 from typing import List
 
-genai.configure(api_key=settings.gemini_api_key)
+EMBED_URL = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={settings.gemini_api_key}"
+CHAT_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={settings.gemini_api_key}"
 
 
-def _embed_text(text: str, task_type: str = "retrieval_query") -> list[float]:
-    result = genai.embed_content(
-        model="models/embedding-001",
-        content=text,
-        task_type=task_type,
-    )
-    return result["embedding"]
+def _embed_text(text: str, task_type: str = "RETRIEVAL_QUERY") -> list[float]:
+    with httpx.Client() as client:
+        resp = client.post(
+            EMBED_URL,
+            json={
+                "model": "models/text-embedding-004",
+                "content": {"parts": [{"text": text}]},
+                "taskType": task_type,
+            },
+        )
+        return resp.json()["embedding"]["values"]
 
 
 def answer_question(user_id: str, question: str, chat_history: List[ChatMessage]) -> str:
-    query_embedding = _embed_text(question, task_type="retrieval_query")
+    query_embedding = _embed_text(question, task_type="RETRIEVAL_QUERY")
 
     chunks = vector_store.search_similar(user_id, query_embedding, top_k=5)
 
@@ -46,6 +51,10 @@ Question: {question}
 
 Answer conversationally and concisely. If the answer isn't in the context, say so. Do not make up information."""
 
-    model = genai.GenerativeModel("gemini-2.0-flash")
-    response = model.generate_content(prompt)
-    return response.text
+    with httpx.Client() as client:
+        resp = client.post(
+            CHAT_URL,
+            json={"contents": [{"parts": [{"text": prompt}]}]},
+        )
+        data = resp.json()
+        return data["candidates"][0]["content"]["parts"][0]["text"]
