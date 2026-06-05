@@ -26,18 +26,21 @@ async def handle_incoming_message(from_number: str, body: str) -> str:
     user = db.get_user_by_whatsapp(from_number)
 
     if not user:
+        if "@" in body and "." in body:
+            email = body.lower().strip()
+            existing = db.get_user_by_email(email)
+            if existing:
+                if existing.whatsapp_number:
+                    return "This email is already linked to another WhatsApp number."
+                db.update_user_whatsapp(email, from_number)
+                return f"Linked to {email}. Visit {settings.app_url}/auth/gmail?email={email} to connect Gmail."
+            new_user = UserAccount(email=email, whatsapp_number=from_number)
+            db.create_user(new_user)
+            return f"Account created for {email}. Visit {settings.app_url}/auth/gmail?email={email} to connect Gmail."
         return "Welcome! Send your email address to connect your Gmail account."
 
     if not user.gmail_refresh_token:
-        existing = db.get_user_by_email(body.lower().strip())
-        if existing:
-            if existing.whatsapp_number:
-                return "This email is already linked to another WhatsApp number."
-            db.update_user_whatsapp(body.lower().strip(), from_number)
-            return f"Linked to {body}. Now visit {settings.app_url}/auth/gmail?email={body} to connect Gmail."
-        new_user = UserAccount(email=body.lower().strip(), whatsapp_number=from_number)
-        db.create_user(new_user)
-        return f"Account created for {body}. Visit {settings.app_url}/auth/gmail?email={body} to connect Gmail."
+        return f"Please connect your Gmail first: {settings.app_url}/auth/gmail?email={user.email}"
 
     if body.lower() == "check mail":
         from app.ingest.processor import process_user_emails
