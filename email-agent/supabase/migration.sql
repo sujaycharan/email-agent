@@ -53,7 +53,8 @@ CREATE INDEX idx_chat_messages_user_id ON chat_messages(user_id);
 CREATE OR REPLACE FUNCTION search_email_chunks(
   query_embedding VECTOR(300),
   user_uuid UUID,
-  match_count INT DEFAULT 5
+  match_count INT DEFAULT 5,
+  similarity_threshold FLOAT DEFAULT 0.0
 ) RETURNS TABLE(
   id UUID,
   email_id UUID,
@@ -70,6 +71,7 @@ BEGIN
   FROM email_chunks ec
   WHERE ec.user_id = user_uuid
     AND ec.embedding IS NOT NULL
+    AND (1 - (ec.embedding <=> query_embedding)) >= similarity_threshold
   ORDER BY ec.embedding <=> query_embedding
   LIMIT match_count;
 END;

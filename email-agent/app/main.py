@@ -24,13 +24,16 @@ def scheduled_email_check():
     users = db.get_users_with_gmail()
     logger.info(f"Found {len(users)} user(s) with Gmail")
     for user in users:
-        process_user_emails(user)
+        if user.gmail_refresh_token:
+            process_user_emails(user)
+        else:
+            logger.warning(f"Skipping {user.email} - no refresh token")
     logger.info("Email check finished")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    scheduler.add_job(scheduled_email_check, "interval", minutes=2)
+    scheduler.add_job(scheduled_email_check, "interval", minutes=10)
     scheduler.start()
     yield
     scheduler.shutdown()

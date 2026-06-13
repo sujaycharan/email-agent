@@ -45,13 +45,25 @@ def answer_question(user_id: str, question: str, chat_history: List[ChatMessage]
 
     query_embedding = _embed_text(question)
 
-    chunks = vector_store.search_similar(user_id, query_embedding, top_k=5)
+    chunks = vector_store.search_similar(user_id, query_embedding, top_k=10)
 
     if not chunks:
-        return "I couldn't find any relevant emails to answer your question."
+        logger.warning(f"No chunks found for user {user_id}, question: {question[:50]}")
+        return "I couldn't find any relevant emails to answer your question. Make sure emails have been processed."
+
+    logger.info(f"Found {len(chunks)} chunks for user {user_id}, question: {question[:50]}")
+    for i, c in enumerate(chunks[:3]):
+        sim = c.get('similarity', 0)
+        logger.info(f"  Chunk {i}: similarity={sim:.3f}, content={c['content'][:80]}...")
+
+    filtered_chunks = [c for c in chunks if c.get('similarity', 0) > 0.3]
+    if not filtered_chunks:
+        logger.warning(f"All chunks below similarity threshold for user {user_id}")
+        return "I found some emails but they don't seem relevant to your question. Try rephrasing."
 
     context = "\n\n".join(
-        f"[Email {i+1}]: {c['content']}" for i, c in enumerate(chunks)
+        f"[Email {i+1}] (similarity: {c.get('similarity', 0):.2f}): {c['content']}"
+        for i, c in enumerate(filtered_chunks[:5])
     )
 
     history_lines = []
@@ -60,9 +72,9 @@ def answer_question(user_id: str, question: str, chat_history: List[ChatMessage]
         history_lines.append(f"{role}: {msg.content}")
     history_text = "\n".join(history_lines)
 
-    prompt = f"""You are an email assistant. Answer the user's question based on their emails.
+    prompt = f"""You are an email assistant. Answer the user's question based ONLY on the provided email context.
 
-Context from user's emails:
+Context from user's emails (ranked by relevance):
 {context}
 
 Chat history:
@@ -70,7 +82,12 @@ Chat history:
 
 Question: {question}
 
-Answer conversationally and concisely. If the answer isn't in the context, say so. Do not make up information."""
+Instructions:
+- Answer conversationally and concisely
+- Use ONLY information from the context above
+- If the answer isn't in the context, say "I don't have that information in your emails"
+- Do not make up information
+- Cite which email number(s) you're referencing"""
 
     with httpx.Client(timeout=60.0) as client:
         for attempt in range(3):

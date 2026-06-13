@@ -9,7 +9,20 @@ def chunk_email(email: EmailRecord) -> List[str]:
     if not text:
         return []
 
-    paragraphs = text.split("\n\n")
+    header_parts = []
+    if email.subject:
+        header_parts.append(f"Subject: {email.subject}")
+    if email.sender_name:
+        header_parts.append(f"From: {email.sender_name}")
+    elif email.sender_email:
+        header_parts.append(f"From: {email.sender_email}")
+    if email.received_at:
+        header_parts.append(f"Date: {email.received_at.strftime('%Y-%m-%d %H:%M')}")
+
+    header = " | ".join(header_parts)
+    full_text = f"{header}\n\n{text}"
+
+    paragraphs = full_text.split("\n\n")
     chunks = []
     current = ""
 
@@ -27,4 +40,4 @@ def chunk_email(email: EmailRecord) -> List[str]:
     if current:
         chunks.append(current.strip())
 
-    return chunks if chunks else [text[:MAX_CHARS]]
+    return chunks if chunks else [full_text[:MAX_CHARS]]
