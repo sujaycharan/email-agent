@@ -26,7 +26,7 @@ def _get_nlp():
     global _nlp
     if _nlp is None:
         try:
-            _nlp = spacy.load("en_core_web_sm")
+            _nlp = spacy.load("en_core_web_md")
         except OSError:
             logger.info("Downloading en_core_web_md model...")
             subprocess.run(
@@ -114,7 +114,11 @@ def process_user_emails(user: UserAccount):
         logger.info(f"{user.email}: processed {processed} emails")
 
     except Exception as e:
-        logger.error(f"Error processing emails for {user.email}: {e}", exc_info=True)
+        if "invalid_grant" in str(e) or "expired" in str(e).lower() or "revoked" in str(e).lower():
+            logger.warning(f"Gmail token expired for {user.email}, clearing from DB")
+            db.update_user_tokens(user.email, "", "", datetime.utcnow())
+        else:
+            logger.error(f"Error processing emails for {user.email}: {e}", exc_info=True)
 
 
 def process_user_emails_async(user: UserAccount):

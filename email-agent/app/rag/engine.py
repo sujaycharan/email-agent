@@ -18,7 +18,7 @@ def _get_nlp():
     global _nlp
     if _nlp is None:
         try:
-            _nlp = spacy.load("en_core_web_sm")
+            _nlp = spacy.load("en_core_web_md")
         except OSError:
             logger.info("Downloading en_core_web_md model...")
             subprocess.run(
@@ -64,14 +64,22 @@ Question: {question}
 
 Answer conversationally and concisely. If the answer isn't in the context, say so. Do not make up information."""
 
-    with httpx.Client() as client:
-        resp = client.post(
-            CHAT_URL,
-            json={"contents": [{"parts": [{"text": prompt}]}]},
-        )
-        data = resp.json()
-        if "candidates" not in data:
-            error = data.get("error", {}).get("message", "Unknown Gemini error")
-            logger.error(f"Gemini API error: {error}")
-            return f"Error: {error}"
-        return data["candidates"][0]["content"]["parts"][0]["text"]
+    with httpx.Client(timeout=60.0) as client:
+        for attempt in range(3):
+            resp = client.post(
+                CHAT_URL,
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+            )
+            if resp.status_code == 429:
+                wait = 60 * (attempt + 1)
+                logger.warning(f"Gemini rate limit (429), waiting {wait}s before retry {attempt + 1}/3")
+                import time
+                time.sleep(wait)
+                continue
+            data = resp.json()
+            if "candidates" not in data:
+                error = data.get("error", {}).get("message", "Unknown Gemini error")
+                logger.error(f"Gemini API error: {error}")
+                return f"Error: {error}"
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        return "Error: Gemini rate limit exceeded after retries"
