@@ -113,12 +113,12 @@ def process_user_emails(user: UserAccount):
 
         logger.info(f"{user.email}: processed {processed} emails")
 
-        except Exception as e:
-            if "invalid_grant" in str(e) or "expired" in str(e).lower() or "revoked" in str(e).lower():
-                logger.warning(f"Gmail token expired for {user.email}, clearing from DB")
-                db.update_user_tokens(user.email, None, None, datetime.utcnow())
-            else:
-                logger.error(f"Error processing emails for {user.email}: {e}", exc_info=True)
+    except Exception as e:
+        if "invalid_grant" in str(e) or "expired" in str(e).lower() or "revoked" in str(e).lower():
+            logger.warning(f"Gmail token expired for {user.email}, clearing from DB")
+            db.update_user_tokens(user.email, None, None, datetime.utcnow())
+        else:
+            logger.error(f"Error processing emails for {user.email}: {e}", exc_info=True)
 
 
 def process_user_emails_async(user: UserAccount):
