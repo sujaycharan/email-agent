@@ -70,4 +70,8 @@ Answer conversationally and concisely. If the answer isn't in the context, say s
             json={"contents": [{"parts": [{"text": prompt}]}]},
         )
         data = resp.json()
+        if "candidates" not in data:
+            error = data.get("error", {}).get("message", "Unknown Gemini error")
+            logger.error(f"Gemini API error: {error}")
+            return f"Error: {error}"
         return data["candidates"][0]["content"]["parts"][0]["text"]

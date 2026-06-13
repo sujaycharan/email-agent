@@ -48,7 +48,12 @@ async def handle_incoming_message(from_number: str, body: str) -> str:
         return "Checking your mail... I'll notify you on WhatsApp when something arrives."
 
     chat_history = db.get_recent_chat_history(user.id, limit=5)
-    answer = answer_question(user.id, body, chat_history)
+    try:
+        answer = answer_question(user.id, body, chat_history)
+    except Exception as e:
+        if "invalid_grant" in str(e) or "expired" in str(e).lower() or "revoked" in str(e).lower():
+            return f"Gmail token expired or revoked. Reconnect: {settings.app_url}/auth/gmail?email={user.email}"
+        raise
 
     db.insert_chat_message(ChatMessage(user_id=user.id, role="user", content=body))
     db.insert_chat_message(ChatMessage(user_id=user.id, role="assistant", content=answer))
