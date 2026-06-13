@@ -26,7 +26,7 @@ def create_user(user: UserAccount) -> UserAccount:
     return user
 
 
-def update_user_tokens(email: str, refresh_token: str, access_token: str, expiry: datetime):
+def update_user_tokens(email: str, refresh_token: str | None, access_token: str | None, expiry: datetime):
     supabase.table("user_accounts").update({
         "gmail_refresh_token": refresh_token,
         "gmail_access_token": access_token,
@@ -41,7 +41,7 @@ def update_user_whatsapp(email: str, whatsapp_number: str):
 
 
 def get_users_with_gmail() -> List[UserAccount]:
-    result = supabase.table("user_accounts").select("*").not_.is_("gmail_refresh_token", "null").execute()
+    result = supabase.table("user_accounts").select("*").not_.is_("gmail_refresh_token", "null").neq("gmail_refresh_token", "").execute()
     return [UserAccount(**row) for row in result.data]
 
 
