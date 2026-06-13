@@ -10,7 +10,10 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 
-CHAT_URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={settings.gemini_api_key}"
+CHAT_URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={settings.gemini_api_key}"
+
+_query_cache: dict[str, str] = {}
+_CACHE_MAX_SIZE = 100
 
 _nlp = None
 
@@ -35,6 +38,11 @@ def _embed_text(text: str) -> list[float]:
 
 
 def answer_question(user_id: str, question: str, chat_history: List[ChatMessage]) -> str:
+    cache_key = f"{user_id}:{question.lower().strip()}"
+    if cache_key in _query_cache:
+        logger.info(f"Cache hit for user {user_id}")
+        return _query_cache[cache_key]
+
     query_embedding = _embed_text(question)
 
     chunks = vector_store.search_similar(user_id, query_embedding, top_k=5)
@@ -81,5 +89,9 @@ Answer conversationally and concisely. If the answer isn't in the context, say s
                 error = data.get("error", {}).get("message", "Unknown Gemini error")
                 logger.error(f"Gemini API error: {error}")
                 return f"Error: {error}"
-            return data["candidates"][0]["content"]["parts"][0]["text"]
+            answer = data["candidates"][0]["content"]["parts"][0]["text"]
+            if len(_query_cache) >= _CACHE_MAX_SIZE:
+                _query_cache.pop(next(iter(_query_cache)))
+            _query_cache[cache_key] = answer
+            return answer
         return "Error: Gemini rate limit exceeded after retries"
