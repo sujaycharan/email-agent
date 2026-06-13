@@ -45,11 +45,42 @@ def _generate_embedding(text: str) -> list[float]:
 
 
 def _generate_summary(email: EmailRecord) -> str:
-    body = (email.body_text or "")[:300]
+    body = (email.body_text or "")[:3000]
+    if not body.strip():
+        body = (email.body_html or "")[:3000]
+
+    header = email.sender_name or email.sender_email
+    subject = email.subject
+
+    try:
+        from app.rag.engine import CHAT_URL
+        import httpx
+
+        prompt = f"""Summarize this email in 2-3 sentences for a WhatsApp notification. Be concise and capture the key points.
+
+From: {header}
+Subject: {subject}
+
+Body:
+{body}
+
+Summary:"""
+
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.post(
+                CHAT_URL,
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+            )
+            data = resp.json()
+            if "candidates" in data:
+                summary = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                return f"📬 {header} - {subject}\n\n{summary}"
+    except Exception as e:
+        logger.warning(f"Gemini summary failed, using fallback: {e}")
+
     lines = [l for l in body.split("\n") if l.strip()]
     snippet = " | ".join(lines[:3])
-    header = email.sender_name or email.sender_email
-    return f"📬 {header} - {email.subject}\n\n{snippet}"
+    return f"📬 {header} - {subject}\n\n{snippet}"
 
 
 def process_user_emails(user: UserAccount):
